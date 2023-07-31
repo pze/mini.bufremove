@@ -228,7 +228,7 @@ H.unshow_and_cmd = function(buf_id, force, cmd)
   -- close such window but somehow it doesn't seem to happen immediately.
   local ok, result = pcall(vim.cmd, command)
   if not (ok or result:find('E516%D') or result:find('E517%D') or result:find('E11%D')) then
-    H.message(result)
+    -- H.message(result)
     return false
   end
 

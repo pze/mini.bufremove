@@ -43,7 +43,8 @@
 ---@alias __bufremove_buf_id number|nil Buffer identifier (see |bufnr()|) to use.
 ---   Default: 0 for current.
 ---@alias __bufremove_force boolean|nil Whether to ignore unsaved changes (using `!` version of
----   command). Default: `false`.
+---   command). If `false`, calling with unsaved changes will prompt confirm dialog.
+---   Default: `false`.
 
 -- Module definition ==========================================================
 local MiniBufremove = {}
@@ -166,7 +167,7 @@ end
 
 -- Helper data ================================================================
 -- Module default config
-H.default_config = MiniBufremove.config
+H.default_config = vim.deepcopy(MiniBufremove.config)
 
 -- Helper functionality =======================================================
 -- Settings -------------------------------------------------------------------
@@ -174,7 +175,7 @@ H.setup_config = function(config)
   -- General idea: if some table elements are not present in user-supplied
   -- `config`, take them from default config
   vim.validate({ config = { config, 'table', true } })
-  config = vim.tbl_deep_extend('force', H.default_config, config or {})
+  config = vim.tbl_deep_extend('force', vim.deepcopy(H.default_config), config or {})
 
   vim.validate({
     set_vim_settings = { config.set_vim_settings, 'boolean' },
@@ -215,7 +216,7 @@ H.unshow_and_cmd = function(buf_id, force, cmd)
   MiniBufremove.unshow(buf_id)
 
   -- Execute command
-  local command = string.format('%s%s %d', cmd, force and '!' or '', buf_id)
+  local command = string.format('%s! %d', cmd, buf_id)
   -- Use `pcall` here to take care of case where `unshow()` was enough. This
   -- can happen with 'bufhidden' option values:
   -- - If `delete` then `unshow()` already `bdelete`d buffer. Without `pcall`
@@ -264,20 +265,9 @@ end
 
 -- Check if buffer can be removed with `MiniBufremove.fun_name` function
 H.can_remove = function(buf_id, force, fun_name)
-  if force then return true end
-
-  if vim.api.nvim_buf_get_option(buf_id, 'modified') then
-    H.message(
-      string.format(
-        'Buffer %d has unsaved changes. Use `MiniBufremove.%s(%d, true)` to force.',
-        buf_id,
-        fun_name,
-        buf_id
-      )
-    )
-    return false
-  end
-  return true
+  if force or not vim.bo[buf_id].modified then return true end
+  local msg = string.format('Buffer %d has unsaved changes. Do you want to force %s?', buf_id, fun_name)
+  return vim.fn.confirm(msg, '&No\n&Yes', 1, 'Question') == 2
 end
 
 -- Compute 'true' buffer id (strictly positive integer). Treat `nil` and 0 as
